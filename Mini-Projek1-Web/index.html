@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini Project 1 - Product Information System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            border: 1px solid #ccc;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f4f4f4;
+        }
+        /* Style indikator stok kritis (< 3) */
+        .stok-kritis {
+            background-color: #ffcccc; /* Warna merah muda */
+            color: #990000;
+            font-weight: bold;
+        }
+        .total-box {
+            padding: 15px;
+            background-color: #eef6ff;
+            border: 1px solid #b6d4fe;
+            display: inline-block;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Product Information System (Konseptual)</h2>
+
+    <!-- PRESENTATION LAYER: Tabel HTML untuk merender data -->
+    <table>
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Nama Produk</th>
+                <th>Kategori</th>
+                <th>Harga</th>
+                <th>Stok</th>
+                <th>Deskripsi</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- DATA LAYER: Baris data produk biasa (Stok >= 3) -->
+            <tr>
+                <td>1</td>
+                <td>Laptop Asus</td>
+                <td>Elektronik</td>
+                <td>Rp 7.000.000</td>
+                <td>5</td>
+                <td>Laptop kerja ringan</td>
+            </tr>
+
+            <!-- PROCESSING LAYER LOGIC: Baris dengan kelas stok-kritis (Stok < 3) -->
+            <tr class="stok-kritis">
+                <td>2</td>
+                <td>Mouse Wireless</td>
+                <td>Aksesori</td>
+                <td>Rp 150.000</td>
+                <td>2</td>
+                <td>Mouse responsif (Stok Kritis)</td>
+            </tr>
+
+            <tr class="stok-kritis">
+                <td>3</td>
+                <td>Keyboard Mekanikal</td>
+                <td>Aksesori</td>
+                <td>Rp 450.000</td>
+                <td>1</td>
+                <td>Switch biru (Stok Kritis)</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <!-- PROCESSING LAYER LOGIC: Hasil kalkulasi nilai aset gudang -->
+    <!-- (Harga * Stok) = (7jt*5) + (150rb*2) + (450rb*1) = 35.000.000 + 300.000 + 450.000 -->
+    <div class="total-box">
+        <strong>Total Nilai Aset Gudang:</strong> Rp 35.750.000
+    </div>
+
+</body>
+</html>
