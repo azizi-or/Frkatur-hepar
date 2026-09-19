@@ -1,0 +1,35 @@
+[
+    {
+        "nama": "netanyahu",
+        "umur": 88,
+        "ipk": 8.99,
+        "penghasilan": 70000,
+        "prestasi": "serang iran",
+        "jenis": "Prestasi",
+        "skor": 219.8,
+        "status": "LULUS",
+        "alasan": "Masuk dalam kuota"
+    },
+    {
+        "nama": "sasa",
+        "umur": 19,
+        "ipk": 3.54,
+        "penghasilan": 4000000,
+        "prestasi": "nyanyi",
+        "jenis": "Prestasi",
+        "skor": 120.8,
+        "status": "LULUS",
+        "alasan": "Masuk dalam kuota"
+    },
+    {
+        "nama": "azizi",
+        "umur": 30,
+        "ipk": 3.5,
+        "penghasilan": 9000,
+        "prestasi": "push mole",
+        "jenis": "Prestasi",
+        "skor": 110.0,
+        "status": "LULUS",
+        "alasan": "Masuk dalam kuota"
+    }
+]

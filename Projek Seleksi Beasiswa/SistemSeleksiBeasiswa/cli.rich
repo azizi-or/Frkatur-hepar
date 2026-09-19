@@ -1,0 +1,278 @@
+import os
+import json
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.prompt import Prompt
+
+# Import dari project kamu
+from models.pendaftar import Pendaftar
+from strategy.prestasi_strategy import PrestasiStrategy
+from strategy.ekonomi_strategy import EkonomiStrategy
+from strategy.afirmasi_strategy import AfirmasiStrategy
+from strategy.kombinasi_strategy import KombinasiStrategy
+from repository.file_manager import FileManager
+from exceptions.berkas_error import BerkasTidakLengkapError
+from exceptions.duplikasi_error import PendaftarDuplikatError
+
+console = Console()
+
+# ==========================
+# Data Program
+# ==========================
+daftar_pendaftar = []
+hasil_penilaian = []
+
+
+# ==========================
+# Auto-Load Data
+# ==========================
+def muat_data_otomatis():
+    filepath = "data/penilaian.json"
+    if not os.path.exists(filepath):
+        return
+
+    try:
+        with open(filepath, "r") as file:
+            data = json.load(file)
+            for item in data:
+                p = Pendaftar(
+                    item["nama"],
+                    item["umur"],
+                    item["ipk"],
+                    item["penghasilan"],
+                    item["prestasi"],
+                    True,
+                    item["jenis"]
+                )
+                p.skor = item.get("skor", 0)
+                p.status = item.get("status", "-")
+                p.alasan = item.get("alasan", "-")
+                daftar_pendaftar.append(p)
+        console.print(f"[bold green]✔ Berhasil memuat {len(daftar_pendaftar)} data pendaftar lama.[/bold green]")
+    except Exception as e:
+        console.print(f"[bold yellow]⚠ Gagal memuat data lama: {e}[/bold yellow]")
+
+
+# ==========================
+# Memilih Strategy
+# ==========================
+def pilih_strategy(jenis):
+    if jenis.lower() == "prestasi":
+        return PrestasiStrategy()
+    elif jenis.lower() == "ekonomi":
+        return EkonomiStrategy()
+    elif jenis.lower() == "afirmasi":
+        return AfirmasiStrategy()
+    else:
+        return KombinasiStrategy()
+
+
+# ==========================
+# 1. Tambah Pendaftar
+# ==========================
+def tambah_pendaftar():
+    console.print(Panel("[bold cyan]FORM PENDAFTARAN BEASISWA[/bold cyan]", expand=False))
+
+    try:
+        nama = Prompt.ask("Masukkan Nama").strip()
+        if not nama:
+            console.print("[bold red]tolong isi seuai permintaaan yang ada di form[/bold red]")
+            return
+
+        raw_umur = Prompt.ask("Masukkan Umur")
+        umur = int(raw_umur)
+
+        if umur < 15 or umur > 35:
+            console.print("[bold red]umur tidak sesuai[/bold red]")
+            return
+
+        raw_ipk = Prompt.ask("Masukkan IPK").replace(",", ".")
+        ipk = float(raw_ipk)
+
+        raw_penghasilan = Prompt.ask("Penghasilan Orang Tua (Rp)")
+        penghasilan = int(raw_penghasilan)
+
+        prestasi = Prompt.ask("Prestasi (Isi '-' jika tidak ada)").strip()
+        berkas = Prompt.ask("Berkas lengkap?", choices=["y", "t"], default="y").strip().lower()
+        jenis = Prompt.ask("Jenis Beasiswa", choices=["Prestasi", "Ekonomi", "Afirmasi"], default="Prestasi")
+
+        # Cek Duplikasi Nama
+        for p in daftar_pendaftar:
+            if p.nama.lower() == nama.lower():
+                raise PendaftarDuplikatError()
+
+        if ipk < 3.00:
+            console.print("[bold yellow]IPK tidak memenuhi syarat (min. 3.00)[/bold yellow]")
+            return
+
+        if berkas != "y":
+            raise BerkasTidakLengkapError()
+
+        # Buat Objek Pendaftar & Hitung Skor
+        pendaftar = Pendaftar(nama, umur, ipk, penghasilan, prestasi, True, jenis)
+        strategy = pilih_strategy(jenis)
+        pendaftar.skor = strategy.hitung(pendaftar)
+        pendaftar.status = "Belum Dinilai"
+        pendaftar.alasan = "-"
+
+        daftar_pendaftar.append(pendaftar)
+        console.print(f"\n[bold green]✔ Pendaftar '{nama}' berhasil ditambahkan![/bold green]\n")
+
+    except ValueError:
+        console.print("[bold red]tolong isi seuai permintaaan yang ada di form[/bold red]")
+    except BerkasTidakLengkapError as e:
+        console.print(f"[bold red]{e}[/bold red]")
+    except PendaftarDuplikatError as e:
+        console.print(f"[bold red]{e}[/bold red]")
+
+
+# ==========================
+# 2. Tampilkan Ranking & Seleksi
+# ==========================
+def tampilkan_ranking():
+    if not daftar_pendaftar:
+        console.print("\n[bold yellow]Belum ada pendaftar.[/bold yellow]\n")
+        return
+
+    ranking = sorted(daftar_pendaftar, key=lambda x: x.skor, reverse=True)
+    hasil_penilaian.clear()
+
+    kuota = {"Prestasi": 5, "Ekonomi": 10, "Afirmasi": 3}
+    jumlah_per_jenis = {"Prestasi": 0, "Ekonomi": 0, "Afirmasi": 0}
+
+    for p in ranking:
+        if jumlah_per_jenis.get(p.jenis_beasiswa, 0) < kuota.get(p.jenis_beasiswa, 0):
+            jumlah_per_jenis[p.jenis_beasiswa] += 1
+            p.status = "LULUS"
+            p.alasan = "Masuk dalam kuota"
+        else:
+            p.status = "TIDAK LULUS"
+            p.alasan = "Kuota penuh"
+
+        hasil_penilaian.append({
+            "nama": p.nama, "umur": p.umur, "ipk": p.ipk,
+            "penghasilan": p.penghasilan, "prestasi": p.prestasi,
+            "jenis": p.jenis_beasiswa, "skor": p.skor,
+            "status": p.status, "alasan": p.alasan
+        })
+
+    # Render Tabel Rich
+    tabel = Table(title="[bold yellow]HASIL SELEKSI & RANKING BEASISWA[/bold yellow]", header_style="bold magenta")
+    tabel.add_column("No", justify="center", style="cyan")
+    tabel.add_column("Nama", style="bold white")
+    tabel.add_column("Umur", justify="center")
+    tabel.add_column("IPK", justify="center")
+    tabel.add_column("Jenis Beasiswa", justify="center")
+    tabel.add_column("Skor", justify="right", style="green")
+    tabel.add_column("Status", justify="center")
+    tabel.add_column("Alasan", style="dim")
+
+    for i, p in enumerate(ranking, start=1):
+        status_color = "[bold green]LULUS[/bold green]" if p.status == "LULUS" else "[bold red]TIDAK LULUS[/bold red]"
+        tabel.add_row(
+            str(i), p.nama, str(p.umur), f"{p.ipk:.2f}",
+            p.jenis_beasiswa, f"{p.skor:.2f}", status_color, p.alasan
+        )
+
+    console.print(tabel)
+
+
+# ==========================
+# 3. Cari Pendaftar
+# ==========================
+def cari_pendaftar():
+    if not daftar_pendaftar:
+        console.print("\n[bold yellow]Belum ada pendaftar.[/bold yellow]\n")
+        return
+
+    keyword = Prompt.ask("\nMasukkan nama yang dicari").strip().lower()
+    ditemukan = [p for p in daftar_pendaftar if keyword in p.nama.lower()]
+
+    if not ditemukan:
+        console.print("[bold red]Data pendaftar tidak ditemukan.[/bold red]\n")
+        return
+
+    tabel = Table(title=f"Hasil Pencarian: '{keyword}'", header_style="bold blue")
+    tabel.add_column("Nama")
+    tabel.add_column("Umur", justify="center")
+    tabel.add_column("IPK", justify="center")
+    tabel.add_column("Jenis")
+    tabel.add_column("Skor", justify="right")
+    tabel.add_column("Status")
+
+    for p in ditemukan:
+        tabel.add_row(p.nama, str(p.umur), f"{p.ipk:.2f}", p.jenis_beasiswa, f"{p.skor:.2f}", getattr(p, "status", "-"))
+
+    console.print(tabel)
+
+
+# ==========================
+# 4. Hapus Pendaftar
+# ==========================
+def hapus_pendaftar():
+    global daftar_pendaftar
+    if not daftar_pendaftar:
+        console.print("\n[bold yellow]Belum ada pendaftar.[/bold yellow]\n")
+        return
+
+    nama = Prompt.ask("\nMasukkan Nama Pendaftar yang ingin dihapus").strip().lower()
+    awal = len(daftar_pendaftar)
+    daftar_pendaftar = [p for p in daftar_pendaftar if p.nama.lower() != nama]
+
+    if len(daftar_pendaftar) < awal:
+        console.print(f"[bold green]✔ Pendaftar '{nama}' berhasil dihapus.[/bold green]\n")
+    else:
+        console.print("[bold red]Data pendaftar tidak ditemukan.[/bold red]\n")
+
+
+# ==========================
+# 5. Simpan Hasil
+# ==========================
+def simpan_hasil():
+    if not hasil_penilaian:
+        console.print("[bold yellow]Jalankan 'Tampilkan Ranking & Seleksi' terlebih dahulu sebelum menyimpan![/bold yellow]\n")
+        return
+
+    FileManager.simpan_json(hasil_penilaian, "data/penilaian.json")
+    FileManager.simpan_csv(hasil_penilaian, "data/hasil_seleksi.csv")
+    console.print("[bold green]✔ Hasil berhasil disimpan ke File JSON dan CSV.[/bold green]\n")
+
+
+# ==========================
+# Menu Utama
+# ==========================
+def menu():
+    muat_data_otomatis()
+
+    while True:
+        console.print(Panel.fit(
+            "[bold white]1.[/bold white] Tambah Pendaftar\n"
+            "[bold white]2.[/bold white] Tampilkan Ranking & Seleksi\n"
+            "[bold white]3.[/bold white] Cari Pendaftar\n"
+            "[bold white]4.[/bold white] Hapus Pendaftar\n"
+            "[bold white]5.[/bold white] Simpan Hasil ke File\n"
+            "[bold white]6.[/bold white] Keluar",
+            title="[bold blue]SISTEM SELEKSI BEASISWA (CLI)[/bold blue]",
+            border_style="cyan"
+        ))
+
+        pilihan = Prompt.ask("Pilih menu", choices=["1", "2", "3", "4", "5", "6"])
+
+        if pilihan == "1":
+            tambah_pendaftar()
+        elif pilihan == "2":
+            tampilkan_ranking()
+        elif pilihan == "3":
+            cari_pendaftar()
+        elif pilihan == "4":
+            hapus_pendaftar()
+        elif pilihan == "5":
+            simpan_hasil()
+        elif pilihan == "6":
+            console.print("\n[bold green]Terima kasih telah menggunakan program.[/bold green]")
+            break
+
+
+if __name__ == "__main__":
+    menu()
